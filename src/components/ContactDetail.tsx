@@ -12,7 +12,8 @@ import {
   Calendar,
   Clock,
   Battery,
-  TrendingUp
+  TrendingUp,
+  MapPin
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -155,6 +156,12 @@ const ContactDetail: React.FC<ContactDetailProps> = ({
                   <div className="flex items-center space-x-1">
                     <Phone className="w-4 h-4" />
                     <span>{contact.phone}</span>
+                  </div>
+                )}
+                {contact.location && (
+                  <div className="flex items-center space-x-1">
+                    <MapPin className="w-4 h-4" />
+                    <span>{contact.location}</span>
                   </div>
                 )}
               </div>

@@ -4,6 +4,7 @@ export interface Contact {
   name: string;
   email?: string;
   phone?: string;
+  location?: string; // City/location where the contact is based
   notes?: string;
   createdAt: Date;
   updatedAt: Date;

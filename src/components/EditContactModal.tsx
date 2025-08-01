@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Phone, FileText } from 'lucide-react';
+import { X, User, Mail, Phone, FileText, MapPin } from 'lucide-react';
 import { Contact } from '../types';
 
 interface EditContactModalProps {
@@ -13,6 +13,7 @@ const EditContactModal: React.FC<EditContactModalProps> = ({ contact, onClose, o
     name: '',
     email: '',
     phone: '',
+    location: '',
     notes: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -22,6 +23,7 @@ const EditContactModal: React.FC<EditContactModalProps> = ({ contact, onClose, o
       name: contact.name || '',
       email: contact.email || '',
       phone: contact.phone || '',
+      location: contact.location || '',
       notes: contact.notes || '',
     });
   }, [contact]);
@@ -50,6 +52,7 @@ const EditContactModal: React.FC<EditContactModalProps> = ({ contact, onClose, o
         name: formData.name.trim(),
         email: formData.email.trim() || undefined,
         phone: formData.phone.trim() || undefined,
+        location: formData.location.trim() || undefined,
         notes: formData.notes.trim() || undefined,
       });
     }
@@ -140,6 +143,25 @@ const EditContactModal: React.FC<EditContactModalProps> = ({ contact, onClose, o
                 onChange={(e) => handleChange('phone', e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-white/50 border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="Enter phone number"
+              />
+            </div>
+          </div>
+
+          {/* Location Field */}
+          <div>
+            <label htmlFor="edit-contact-location" className="block text-sm font-medium text-gray-700 mb-2">
+              Location
+            </label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                id="edit-contact-location"
+                name="location"
+                type="text"
+                value={formData.location}
+                onChange={(e) => handleChange('location', e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-white/50 border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Enter city or location"
               />
             </div>
           </div>

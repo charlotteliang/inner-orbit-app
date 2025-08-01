@@ -143,7 +143,8 @@ const AddInteractionModal: React.FC<AddInteractionModalProps> = ({ contact, onCl
                 value={formatDateForInput(formData.timestamp)}
                 onChange={(e) => {
                   const currentTime = formData.timestamp;
-                  const newDate = new Date(e.target.value);
+                  const [year, month, day] = e.target.value.split('-').map(Number);
+                  const newDate = new Date(year, month - 1, day); // month is 0-indexed
                   newDate.setHours(currentTime.getHours());
                   setFormData(prev => ({ ...prev, timestamp: newDate }));
                 }}

@@ -39,7 +39,7 @@ const dateToTimestamp = (date: Date): Timestamp => {
 };
 
 // Sensitive fields that need encryption
-const CONTACT_SENSITIVE_FIELDS = ['name', 'email', 'phone', 'notes'] as const;
+const CONTACT_SENSITIVE_FIELDS = ['name', 'email', 'phone', 'location', 'notes'] as const;
 const INTERACTION_SENSITIVE_FIELDS = ['notes'] as const;
 
 // Convert Contact to Firestore document with encryption

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Contact } from '../types';
-import { MessageCircle, Calendar, Edit, Trash2, Plus } from 'lucide-react';
+import { MessageCircle, Calendar, Edit, Trash2, Plus, MapPin } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ContactStats {
@@ -48,6 +48,12 @@ const ContactCard: React.FC<ContactCardProps> = ({
             <h3 className="font-semibold text-gray-800 text-lg">{contact.name}</h3>
             {contact.email && (
               <p className="text-sm text-gray-600">{contact.email}</p>
+            )}
+            {contact.location && (
+              <div className="flex items-center space-x-1 text-sm text-gray-600">
+                <MapPin className="w-3 h-3" />
+                <span>{contact.location}</span>
+              </div>
             )}
           </div>
         </div>
