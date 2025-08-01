@@ -15,6 +15,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { Contact, Interaction } from '../types';
+import { EncryptionService } from './encryptionService';
 
 // Check if Firebase is available
 const isFirebaseAvailable = () => {
@@ -36,11 +37,22 @@ const dateToTimestamp = (date: Date): Timestamp => {
   return Timestamp.fromDate(date);
 };
 
-// Convert Contact to Firestore document
-const contactToFirestore = (contact: Omit<Contact, 'id'>) => {
-  // Filter out undefined values before sending to Firestore
+// Sensitive fields that need encryption
+const CONTACT_SENSITIVE_FIELDS = ['name', 'email', 'phone', 'notes'] as const;
+const INTERACTION_SENSITIVE_FIELDS = ['notes'] as const;
+
+// Convert Contact to Firestore document with encryption
+const contactToFirestore = async (contact: Omit<Contact, 'id'>, userId: string) => {
+  // Encrypt sensitive fields
+  const encryptedContact = await EncryptionService.encryptObject(
+    contact,
+    CONTACT_SENSITIVE_FIELDS,
+    userId
+  );
+  
+  // Filter out undefined values and prepare for Firestore
   const cleanContact = Object.fromEntries(
-    Object.entries(contact).filter(([_, value]) => value !== undefined)
+    Object.entries(encryptedContact).filter(([_, value]) => value !== undefined)
   );
   
   return {
@@ -50,22 +62,37 @@ const contactToFirestore = (contact: Omit<Contact, 'id'>) => {
   };
 };
 
-// Convert Firestore document to Contact
-const firestoreToContact = (doc: any): Contact => {
+// Convert Firestore document to Contact with decryption
+const firestoreToContact = async (doc: any, userId: string): Promise<Contact> => {
   const data = doc.data();
+  
+  // Decrypt sensitive fields
+  const decryptedData = await EncryptionService.decryptObject(
+    data,
+    CONTACT_SENSITIVE_FIELDS,
+    userId
+  );
+  
   return {
-    ...data,
+    ...decryptedData,
     id: doc.id,
     createdAt: timestampToDate(data.createdAt),
     updatedAt: timestampToDate(data.updatedAt),
   };
 };
 
-// Convert Interaction to Firestore document
-const interactionToFirestore = (interaction: Omit<Interaction, 'id'>) => {
-  // Filter out undefined values before sending to Firestore
+// Convert Interaction to Firestore document with encryption
+const interactionToFirestore = async (interaction: Omit<Interaction, 'id'>, userId: string) => {
+  // Encrypt sensitive fields
+  const encryptedInteraction = await EncryptionService.encryptObject(
+    interaction,
+    INTERACTION_SENSITIVE_FIELDS,
+    userId
+  );
+  
+  // Filter out undefined values and prepare for Firestore
   const cleanInteraction = Object.fromEntries(
-    Object.entries(interaction).filter(([_, value]) => value !== undefined)
+    Object.entries(encryptedInteraction).filter(([_, value]) => value !== undefined)
   );
   
   return {
@@ -76,11 +103,19 @@ const interactionToFirestore = (interaction: Omit<Interaction, 'id'>) => {
   };
 };
 
-// Convert Firestore document to Interaction
-const firestoreToInteraction = (doc: any): Interaction => {
+// Convert Firestore document to Interaction with decryption
+const firestoreToInteraction = async (doc: any, userId: string): Promise<Interaction> => {
   const data = doc.data();
+  
+  // Decrypt sensitive fields
+  const decryptedData = await EncryptionService.decryptObject(
+    data,
+    INTERACTION_SENSITIVE_FIELDS,
+    userId
+  );
+  
   return {
-    ...data,
+    ...decryptedData,
     id: doc.id,
     timestamp: timestampToDate(data.timestamp),
     createdAt: timestampToDate(data.createdAt),
@@ -89,6 +124,49 @@ const firestoreToInteraction = (doc: any): Interaction => {
 };
 
 export class FirebaseService {
+  // Clear all existing data (for migration to encryption)
+  static async clearAllData(): Promise<void> {
+    if (!isFirebaseAvailable()) {
+      throw new Error('Firebase not configured');
+    }
+
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      const batch = writeBatch(db);
+      
+      // Clear contacts
+      const contactsQuery = query(
+        collection(db, 'contacts'),
+        where('userId', '==', user.uid)
+      );
+      const contactsSnapshot = await getDocs(contactsQuery);
+      contactsSnapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      
+      // Clear interactions
+      const interactionsQuery = query(
+        collection(db, 'interactions'),
+        where('userId', '==', user.uid)
+      );
+      const interactionsSnapshot = await getDocs(interactionsQuery);
+      interactionsSnapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      
+      await batch.commit();
+      console.log('✅ All existing data cleared for encryption migration');
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      throw error;
+    }
+  }
+
   // Contacts CRUD Operations
   static async getContacts(): Promise<Contact[]> {
     if (!isFirebaseAvailable()) {
@@ -104,12 +182,26 @@ export class FirebaseService {
     try {
       const q = query(
         collection(db, 'contacts'),
-        where('userId', '==', user.uid)
+        where('userId', '==', user.uid),
+        orderBy('createdAt', 'desc')
       );
+      
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(firestoreToContact);
+      const contacts: Contact[] = [];
+      
+      for (const doc of querySnapshot.docs) {
+        try {
+          const contact = await firestoreToContact(doc, user.uid);
+          contacts.push(contact);
+        } catch (error) {
+          console.error('Failed to decrypt contact:', error);
+          // Skip contacts that can't be decrypted
+        }
+      }
+      
+      return contacts;
     } catch (error) {
-      console.error('Error fetching contacts from Firebase:', error);
+      console.error('Error getting contacts:', error);
       throw error;
     }
   }
@@ -127,20 +219,22 @@ export class FirebaseService {
 
     try {
       const now = new Date();
-      const contactData = {
+      const contactWithMetadata = {
         ...contact,
         userId: user.uid,
         createdAt: now,
         updatedAt: now,
       };
 
-      const docRef = await addDoc(collection(db, 'contacts'), contactToFirestore(contactData));
+      const firestoreContact = await contactToFirestore(contactWithMetadata, user.uid);
+      const docRef = await addDoc(collection(db, 'contacts'), firestoreContact);
+      
       return {
-        ...contactData,
+        ...contactWithMetadata,
         id: docRef.id,
       };
     } catch (error) {
-      console.error('Error adding contact to Firebase:', error);
+      console.error('Error adding contact:', error);
       throw error;
     }
   }
@@ -150,14 +244,23 @@ export class FirebaseService {
       throw new Error('Firebase not configured');
     }
 
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     try {
-      const contactRef = doc(db, 'contacts', contact.id);
-      const { id, ...contactData } = contact;
-      await updateDoc(contactRef, {
-        ...contactToFirestore({ ...contactData, updatedAt: new Date() }),
-      });
+      const updatedContact = {
+        ...contact,
+        updatedAt: new Date(),
+      };
+
+      const firestoreContact = await contactToFirestore(updatedContact, user.uid);
+      const docRef = doc(db, 'contacts', contact.id);
+      await updateDoc(docRef, firestoreContact);
     } catch (error) {
-      console.error('Error updating contact in Firebase:', error);
+      console.error('Error updating contact:', error);
       throw error;
     }
   }
@@ -204,12 +307,26 @@ export class FirebaseService {
     try {
       const q = query(
         collection(db, 'interactions'),
-        where('userId', '==', user.uid)
+        where('userId', '==', user.uid),
+        orderBy('timestamp', 'desc')
       );
+      
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(firestoreToInteraction);
+      const interactions: Interaction[] = [];
+      
+      for (const doc of querySnapshot.docs) {
+        try {
+          const interaction = await firestoreToInteraction(doc, user.uid);
+          interactions.push(interaction);
+        } catch (error) {
+          console.error('Failed to decrypt interaction:', error);
+          // Skip interactions that can't be decrypted
+        }
+      }
+      
+      return interactions;
     } catch (error) {
-      console.error('Error fetching interactions from Firebase:', error);
+      console.error('Error getting interactions:', error);
       throw error;
     }
   }
@@ -219,16 +336,36 @@ export class FirebaseService {
       throw new Error('Firebase not configured');
     }
 
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     try {
       const q = query(
         collection(db, 'interactions'),
         where('contactId', '==', contactId),
+        where('userId', '==', user.uid),
         orderBy('timestamp', 'desc')
       );
+      
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(firestoreToInteraction);
+      const interactions: Interaction[] = [];
+      
+      for (const doc of querySnapshot.docs) {
+        try {
+          const interaction = await firestoreToInteraction(doc, user.uid);
+          interactions.push(interaction);
+        } catch (error) {
+          console.error('Failed to decrypt interaction:', error);
+          // Skip interactions that can't be decrypted
+        }
+      }
+      
+      return interactions;
     } catch (error) {
-      console.error('Error fetching interactions for contact from Firebase:', error);
+      console.error('Error getting interactions for contact:', error);
       throw error;
     }
   }
@@ -246,20 +383,22 @@ export class FirebaseService {
 
     try {
       const now = new Date();
-      const interactionData = {
+      const interactionWithMetadata = {
         ...interaction,
         userId: user.uid,
         createdAt: now,
         updatedAt: now,
       };
 
-      const docRef = await addDoc(collection(db, 'interactions'), interactionToFirestore(interactionData));
+      const firestoreInteraction = await interactionToFirestore(interactionWithMetadata, user.uid);
+      const docRef = await addDoc(collection(db, 'interactions'), firestoreInteraction);
+      
       return {
-        ...interactionData,
+        ...interactionWithMetadata,
         id: docRef.id,
       };
     } catch (error) {
-      console.error('Error adding interaction to Firebase:', error);
+      console.error('Error adding interaction:', error);
       throw error;
     }
   }
@@ -269,14 +408,23 @@ export class FirebaseService {
       throw new Error('Firebase not configured');
     }
 
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     try {
-      const interactionRef = doc(db, 'interactions', interaction.id);
-      const { id, ...interactionData } = interaction;
-      await updateDoc(interactionRef, {
-        ...interactionToFirestore({ ...interactionData, updatedAt: new Date() }),
-      });
+      const updatedInteraction = {
+        ...interaction,
+        updatedAt: new Date(),
+      };
+
+      const firestoreInteraction = await interactionToFirestore(updatedInteraction, user.uid);
+      const docRef = doc(db, 'interactions', interaction.id);
+      await updateDoc(docRef, firestoreInteraction);
     } catch (error) {
-      console.error('Error updating interaction in Firebase:', error);
+      console.error('Error updating interaction:', error);
       throw error;
     }
   }
@@ -314,8 +462,19 @@ export class FirebaseService {
         where('userId', '==', user.uid)
       );
       
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const contacts = snapshot.docs.map(firestoreToContact);
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const contacts: Contact[] = [];
+        
+        for (const doc of snapshot.docs) {
+          try {
+            const contact = await firestoreToContact(doc, user.uid);
+            contacts.push(contact);
+          } catch (error) {
+            console.error('Failed to decrypt contact in subscription:', error);
+            // Skip contacts that can't be decrypted
+          }
+        }
+        
         callback(contacts);
       }, (error) => {
         console.error('Error in contacts subscription:', error);
@@ -347,8 +506,19 @@ export class FirebaseService {
         where('userId', '==', user.uid)
       );
       
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const interactions = snapshot.docs.map(firestoreToInteraction);
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const interactions: Interaction[] = [];
+        
+        for (const doc of snapshot.docs) {
+          try {
+            const interaction = await firestoreToInteraction(doc, user.uid);
+            interactions.push(interaction);
+          } catch (error) {
+            console.error('Failed to decrypt interaction in subscription:', error);
+            // Skip interactions that can't be decrypted
+          }
+        }
+        
         callback(interactions);
       }, (error) => {
         console.error('Error in interactions subscription:', error);
@@ -385,8 +555,19 @@ export class FirebaseService {
         orderBy('timestamp', 'desc')
       );
       
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const interactions = snapshot.docs.map(firestoreToInteraction);
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const interactions: Interaction[] = [];
+        
+        for (const doc of snapshot.docs) {
+          try {
+            const interaction = await firestoreToInteraction(doc, user.uid);
+            interactions.push(interaction);
+          } catch (error) {
+            console.error('Failed to decrypt interaction in contact interactions subscription:', error);
+            // Skip interactions that can't be decrypted
+          }
+        }
+        
         callback(interactions);
       }, (error) => {
         console.error('Error in contact interactions subscription:', error);

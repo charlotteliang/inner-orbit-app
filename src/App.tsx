@@ -5,7 +5,6 @@ import { AuthService, AuthUser } from './services/authService';
 import Header from './components/Header';
 import ContactList from './components/ContactList';
 import ContactDetail from './components/ContactDetail';
-import AddContactModal from './components/AddContactModal';
 import LoadingSpinner from './components/LoadingSpinner';
 import LoginPage from './components/LoginPage';
 
@@ -20,6 +19,7 @@ function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [hasClearedData, setHasClearedData] = useState(false);
 
   useEffect(() => {
     // Set up authentication state listener
@@ -158,6 +158,17 @@ function App() {
     try {
       const user = await AuthService.signInWithGoogle();
       setUser(user);
+      
+      // Clear existing data on first sign-in for encryption migration
+      if (!hasClearedData) {
+        try {
+          await HybridStorageService.clearAllData();
+          setHasClearedData(true);
+          console.log('✅ Existing data cleared for encryption migration');
+        } catch (error) {
+          console.error('Failed to clear existing data:', error);
+        }
+      }
     } catch (error: any) {
       setAuthError(error.message);
     } finally {

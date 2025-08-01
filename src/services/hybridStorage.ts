@@ -1,6 +1,7 @@
 import { FirebaseService } from './firebaseService';
 import { StorageService } from './storage';
 import { Contact, Interaction } from '../types';
+import { EncryptionService } from './encryptionService';
 
 export class HybridStorageService {
   private static isFirebaseEnabled = false;
@@ -44,10 +45,31 @@ export class HybridStorageService {
       } catch (error) {
         console.warn('Firebase failed, falling back to localStorage for contacts');
         this.isFirebaseEnabled = false;
-        return StorageService.getContacts();
+        return await this.getContactsFromLocalStorage();
       }
     }
-    return StorageService.getContacts();
+    return await this.getContactsFromLocalStorage();
+  }
+
+  private static async getContactsFromLocalStorage(): Promise<Contact[]> {
+    const contacts = StorageService.getContacts();
+    const decryptedContacts: Contact[] = [];
+    
+    for (const contact of contacts) {
+      try {
+        const decryptedContact = await EncryptionService.decryptObject(
+          contact,
+          ['name', 'email', 'phone', 'notes'],
+          'local-user'
+        );
+        decryptedContacts.push(decryptedContact as Contact);
+      } catch (error) {
+        console.error('Failed to decrypt contact from localStorage:', error);
+        // Skip contacts that can't be decrypted
+      }
+    }
+    
+    return decryptedContacts;
   }
 
   static async addContact(contact: Omit<Contact, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<Contact> {
@@ -59,26 +81,31 @@ export class HybridStorageService {
       } catch (error) {
         console.warn('Firebase failed, falling back to localStorage for adding contact');
         this.isFirebaseEnabled = false;
-        const newContact: Contact = {
-          ...contact,
-          userId: 'local-user', // Fallback user ID for localStorage
-          id: crypto.randomUUID(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        StorageService.addContact(newContact);
-        return newContact;
+        return await this.addContactToLocalStorage(contact);
       }
     }
-    const newContact: Contact = {
+    return await this.addContactToLocalStorage(contact);
+  }
+
+  private static async addContactToLocalStorage(contact: Omit<Contact, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<Contact> {
+    const now = new Date();
+    const contactWithMetadata = {
       ...contact,
-      userId: 'local-user', // Fallback user ID for localStorage
       id: crypto.randomUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      userId: 'local-user',
+      createdAt: now,
+      updatedAt: now,
     };
-    StorageService.addContact(newContact);
-    return newContact;
+
+    // For localStorage, we'll store encrypted data as well
+    const encryptedContact = await EncryptionService.encryptObject(
+      contactWithMetadata,
+      ['name', 'email', 'phone', 'notes'],
+      'local-user'
+    );
+
+    StorageService.addContact(encryptedContact);
+    return contactWithMetadata;
   }
 
   static async updateContact(contact: Contact): Promise<void> {
@@ -121,10 +148,10 @@ export class HybridStorageService {
       } catch (error) {
         console.warn('Firebase failed, falling back to localStorage for interactions');
         this.isFirebaseEnabled = false;
-        return StorageService.getInteractions();
+        return await this.getInteractionsFromLocalStorage();
       }
     }
-    return StorageService.getInteractions();
+    return await this.getInteractionsFromLocalStorage();
   }
 
   static async getInteractionsForContact(contactId: string): Promise<Interaction[]> {
@@ -134,10 +161,34 @@ export class HybridStorageService {
       } catch (error) {
         console.warn('Firebase failed, falling back to localStorage for contact interactions');
         this.isFirebaseEnabled = false;
-        return StorageService.getInteractionsForContact(contactId);
+        return await this.getInteractionsFromLocalStorage(contactId);
       }
     }
-    return StorageService.getInteractionsForContact(contactId);
+    return await this.getInteractionsFromLocalStorage(contactId);
+  }
+
+  private static async getInteractionsFromLocalStorage(contactId?: string): Promise<Interaction[]> {
+    const interactions = contactId 
+      ? StorageService.getInteractionsForContact(contactId)
+      : StorageService.getInteractions();
+    
+    const decryptedInteractions: Interaction[] = [];
+    
+    for (const interaction of interactions) {
+      try {
+        const decryptedInteraction = await EncryptionService.decryptObject(
+          interaction,
+          ['notes'],
+          'local-user'
+        );
+        decryptedInteractions.push(decryptedInteraction as Interaction);
+      } catch (error) {
+        console.error('Failed to decrypt interaction from localStorage:', error);
+        // Skip interactions that can't be decrypted
+      }
+    }
+    
+    return decryptedInteractions;
   }
 
   static async addInteraction(interaction: Omit<Interaction, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<Interaction> {
@@ -149,26 +200,31 @@ export class HybridStorageService {
       } catch (error) {
         console.warn('Firebase failed, falling back to localStorage for adding interaction');
         this.isFirebaseEnabled = false;
-        const newInteraction: Interaction = {
-          ...interaction,
-          userId: 'local-user', // Fallback user ID for localStorage
-          id: crypto.randomUUID(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        StorageService.addInteraction(newInteraction);
-        return newInteraction;
+        return await this.addInteractionToLocalStorage(interaction);
       }
     }
-    const newInteraction: Interaction = {
+    return await this.addInteractionToLocalStorage(interaction);
+  }
+
+  private static async addInteractionToLocalStorage(interaction: Omit<Interaction, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<Interaction> {
+    const now = new Date();
+    const interactionWithMetadata = {
       ...interaction,
-      userId: 'local-user', // Fallback user ID for localStorage
       id: crypto.randomUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      userId: 'local-user',
+      createdAt: now,
+      updatedAt: now,
     };
-    StorageService.addInteraction(newInteraction);
-    return newInteraction;
+
+    // For localStorage, we'll store encrypted data as well
+    const encryptedInteraction = await EncryptionService.encryptObject(
+      interactionWithMetadata,
+      ['notes'],
+      'local-user'
+    );
+
+    StorageService.addInteraction(encryptedInteraction);
+    return interactionWithMetadata;
   }
 
   static async updateInteraction(interaction: Interaction): Promise<void> {
@@ -276,6 +332,26 @@ export class HybridStorageService {
     }
   }
 
+  // Clear all existing data (for migration to encryption)
+  static async clearAllData(): Promise<void> {
+    if (this.isFirebaseEnabled) {
+      try {
+        await FirebaseService.clearAllData();
+      } catch (error) {
+        console.error('Failed to clear Firebase data:', error);
+      }
+    }
+    
+    // Clear localStorage data
+    try {
+      localStorage.removeItem('contacts');
+      localStorage.removeItem('interactions');
+      console.log('✅ All existing data cleared for encryption migration');
+    } catch (error) {
+      console.error('Failed to clear localStorage data:', error);
+    }
+  }
+
   // Get storage status
   static getStorageStatus(): { isFirebaseEnabled: boolean; isLocalStorageAvailable: boolean } {
     return {
@@ -283,4 +359,4 @@ export class HybridStorageService {
       isLocalStorageAvailable: typeof window !== 'undefined' && window.localStorage !== undefined,
     };
   }
-} 
+}
