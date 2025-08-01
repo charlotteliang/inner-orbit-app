@@ -11,8 +11,21 @@ export class HybridStorageService {
     try {
       console.log('🔍 Initializing HybridStorageService...');
       
-      // Since we hardcoded the config, let's just test Firebase directly
-      console.log('✅ Testing Firebase connection...');
+      // Check if Firebase environment variables are available
+      const hasFirebaseConfig = process.env.REACT_APP_FIREBASE_API_KEY && 
+                               process.env.REACT_APP_FIREBASE_PROJECT_ID &&
+                               process.env.REACT_APP_FIREBASE_API_KEY !== 'your_api_key_here';
+      
+      console.log('🔍 Firebase config check:', {
+        hasApiKey: !!process.env.REACT_APP_FIREBASE_API_KEY,
+        hasProjectId: !!process.env.REACT_APP_FIREBASE_PROJECT_ID,
+        apiKeyValid: process.env.REACT_APP_FIREBASE_API_KEY !== 'your_api_key_here',
+        hasFirebaseConfig
+      });
+      
+      if (!hasFirebaseConfig) {
+        throw new Error('Firebase environment variables not properly configured');
+      }
       
       try {
         // Import the already initialized Firebase instance
@@ -349,6 +362,17 @@ export class HybridStorageService {
       console.log('✅ All existing data cleared for encryption migration');
     } catch (error) {
       console.error('Failed to clear localStorage data:', error);
+    }
+  }
+
+  // Clear localStorage only (for debugging)
+  static clearLocalStorage(): void {
+    try {
+      localStorage.removeItem('contacts');
+      localStorage.removeItem('interactions');
+      console.log('✅ localStorage cleared');
+    } catch (error) {
+      console.error('Failed to clear localStorage:', error);
     }
   }
 

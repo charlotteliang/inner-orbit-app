@@ -9,6 +9,7 @@ import {
   query,
   orderBy,
   where,
+  limit,
   Timestamp,
   writeBatch,
 } from 'firebase/firestore';
@@ -163,6 +164,40 @@ export class FirebaseService {
       console.log('✅ All existing data cleared for encryption migration');
     } catch (error) {
       console.error('Error clearing data:', error);
+      throw error;
+    }
+  }
+
+  // Test Firebase connection (for debugging)
+  static async testConnection(): Promise<void> {
+    if (!isFirebaseAvailable()) {
+      throw new Error('Firebase not configured');
+    }
+
+    const auth = getAuth();
+    const user = auth.currentUser;
+    
+    console.log('🔍 Firebase connection test:', {
+      hasAuth: !!auth,
+      hasUser: !!user,
+      userId: user?.uid
+    });
+
+    if (!user) {
+      throw new Error('User not authenticated - please sign in first');
+    }
+
+    try {
+      // Test a simple Firestore operation
+      const testQuery = query(
+        collection(db, 'contacts'),
+        where('userId', '==', user.uid),
+        limit(1)
+      );
+      await getDocs(testQuery);
+      console.log('✅ Firebase connection test successful');
+    } catch (error) {
+      console.error('❌ Firebase connection test failed:', error);
       throw error;
     }
   }
