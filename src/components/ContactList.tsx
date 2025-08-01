@@ -27,10 +27,11 @@ const ContactList: React.FC<ContactListProps> = ({
 }) => {
 
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  
-
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddContact, setShowAddContact] = useState(false);
+  
+  // Dunbar's number limit for close friends
+  const MAX_CONTACTS = 15;
   
   // REMOVED: This was causing the modal to close automatically
   const [addingInteractionFor, setAddingInteractionFor] = useState<Contact | null>(null);
@@ -91,6 +92,7 @@ const ContactList: React.FC<ContactListProps> = ({
                 console.error('Error adding contact from ContactList (empty state):', error);
               }
             }}
+            currentContactCount={contacts.length}
           />
         )}
       </>
@@ -102,15 +104,27 @@ const ContactList: React.FC<ContactListProps> = ({
       {/* Header with Search and Add Button */}
       <div className="glass-effect rounded-xl p-4 card-shadow">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Your Contacts</h2>
-          <button
-            onClick={() => setShowAddContact(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors duration-200 font-medium"
-            type="button"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Add Contact</span>
-          </button>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800">Your Contacts</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {contacts.length}/{MAX_CONTACTS} close friends
+            </p>
+          </div>
+          {contacts.length >= MAX_CONTACTS ? (
+            <div className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-500 rounded-lg font-medium">
+              <Plus className="w-5 h-5" />
+              <span>Limit Reached</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAddContact(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors duration-200 font-medium"
+              type="button"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Add Contact</span>
+            </button>
+          )}
         </div>
         
         {/* Search Bar */}
@@ -154,6 +168,22 @@ const ContactList: React.FC<ContactListProps> = ({
         </div>
       )}
 
+      {contacts.length >= MAX_CONTACTS && (
+        <div className="glass-effect rounded-xl p-6 card-shadow border-l-4 border-amber-400">
+          <div className="flex items-start space-x-3">
+            <Users className="w-6 h-6 text-amber-600 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-gray-800 mb-1">Close Friend Limit Reached</h3>
+              <p className="text-gray-600 text-sm">
+                You've reached the limit of {MAX_CONTACTS} close friends. This limit is based on Dunbar's number research, 
+                which suggests humans can maintain about 150 meaningful relationships, with approximately 15 being close friends. 
+                Consider removing a contact if you want to add someone new to your inner circle.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editingContact && (
         <EditContactModal
           contact={editingContact}
@@ -176,6 +206,7 @@ const ContactList: React.FC<ContactListProps> = ({
               console.error('Error adding contact from ContactList (main state):', error);
             }
           }}
+          currentContactCount={contacts.length}
         />
       )}
 

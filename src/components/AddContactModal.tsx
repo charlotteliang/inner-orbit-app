@@ -5,9 +5,10 @@ import { Contact } from '../types';
 interface AddContactModalProps {
   onClose: () => void;
   onAdd: (contact: Omit<Contact, 'id' | 'createdAt' | 'updatedAt' | 'userId'>) => void;
+  currentContactCount: number;
 }
 
-const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAdd }) => {
+const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAdd, currentContactCount }) => {
   
   const [formData, setFormData] = useState({
     name: '',
@@ -58,7 +59,12 @@ const AddContactModal: React.FC<AddContactModalProps> = ({ onClose, onAdd }) => 
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="glass-effect rounded-2xl p-6 w-full max-w-md card-shadow animate-slide-up">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-800">Add New Contact</h2>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800">Add New Contact</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {currentContactCount}/15 close friends
+            </p>
+          </div>
           <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-white/20 transition-colors duration-200"

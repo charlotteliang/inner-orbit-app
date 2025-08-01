@@ -10,6 +10,7 @@ A personal relationship management app that helps you cultivate and strengthen y
 
 ### 🔗 Curated Contact Management
 - Focus on the people who are most important to you
+- Limited to 15 close friends (based on Dunbar's number research)
 - Manually add individuals to your network
 - Add a name initially and fill in more details later
 - Ensure you're tracking meaningful relationships rather than a cluttered contact list
