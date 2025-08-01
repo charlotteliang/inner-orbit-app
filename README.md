@@ -27,6 +27,15 @@ A personal relationship management app that helps you cultivate and strengthen y
 - Identify what makes relationships flourish or disconnect
 - Interactive dots for quick editing of past interactions
 
+### 🕸️ Network Visualization
+- Interactive network graph showing your relationship ecosystem
+- **Network Mode**: All contacts positioned by recency and interaction frequency
+- **Location Mode**: Separates local vs non-local contacts with visual boundary
+- Smart positioning: closer contacts = more recent interactions + higher frequency
+- Color-coded energy levels: green (energizing) to red (depleting)
+- Hover tooltips with detailed contact information
+- **Location Mode Note**: Currently optimized for California Bay Area users. If you live in another state, please request a feature update to customize the location detection for your region.
+
 ### 🔐 Secure & Private
 - Firebase Authentication with Google Sign-In
 - User-specific data isolation

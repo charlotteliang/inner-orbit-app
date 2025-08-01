@@ -5,6 +5,7 @@ import { AuthService, AuthUser } from './services/authService';
 import Header from './components/Header';
 import ContactList from './components/ContactList';
 import ContactDetail from './components/ContactDetail';
+import NetworkGraph from './components/NetworkGraph';
 import LoadingSpinner from './components/LoadingSpinner';
 import LoginPage from './components/LoginPage';
 
@@ -14,7 +15,7 @@ function App() {
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
 
-  const [view, setView] = useState<'list' | 'detail'>('list');
+  const [view, setView] = useState<'list' | 'detail' | 'network'>('list');
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -152,6 +153,18 @@ function App() {
     setView('list');
   };
 
+  const handleViewChange = (newView: 'list' | 'detail' | 'network') => {
+    if (newView === 'detail' && selectedContact) {
+      setView('detail');
+    } else if (newView === 'list') {
+      setSelectedContact(null);
+      setView('list');
+    } else if (newView === 'network') {
+      setSelectedContact(null);
+      setView('network');
+    }
+  };
+
   const handleSignIn = async () => {
     setIsAuthLoading(true);
     setAuthError(null);
@@ -201,6 +214,8 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
       <Header 
+        currentView={view}
+        onViewChange={handleViewChange}
         onBackToList={view === 'detail' ? handleBackToList : undefined}
         onSignOut={handleSignOut}
         title={view === 'detail' ? selectedContact?.name || 'Contact Details' : 'Inner Orbit'}
@@ -208,7 +223,7 @@ function App() {
       />
       
       <main className="container mx-auto px-4 py-8 max-w-6xl">
-        {view === 'list' ? (
+        {view === 'list' && (
           <ContactList
             contacts={contacts}
             interactions={interactions}
@@ -218,16 +233,21 @@ function App() {
             onAddContact={handleAddContact}
             onAddInteraction={handleAddInteraction}
           />
-        ) : (
-          selectedContact && (
-            <ContactDetail
-              contact={selectedContact}
-              interactions={interactions.filter(i => i.contactId === selectedContact.id)}
-              onAddInteraction={handleAddInteraction}
-              onUpdateInteraction={handleUpdateInteraction}
-              onUpdateContact={handleUpdateContact}
-            />
-          )
+        )}
+        {view === 'detail' && selectedContact && (
+          <ContactDetail
+            contact={selectedContact}
+            interactions={interactions.filter(i => i.contactId === selectedContact.id)}
+            onAddInteraction={handleAddInteraction}
+            onUpdateInteraction={handleUpdateInteraction}
+            onUpdateContact={handleUpdateContact}
+          />
+        )}
+        {view === 'network' && (
+          <NetworkGraph
+            contacts={contacts}
+            interactions={interactions}
+          />
         )}
       </main>
 
